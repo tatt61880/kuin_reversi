@@ -1,0 +1,199 @@
+{
+    reversi.kn (for Kuin 0.023):
+        Last Modified: 2013/03/25 12:21:38.
+        Created by @tatt61880
+            https://twitter.com/tatt61880
+            https://github.com/tatt61880
+}
+
+func Init(cfg:Kuin@CCfg)
+    do cfg.Title :: "リバーシ"
+    do cfg.FullScr :: false
+    do cfg.PadNum :: 1
+    do cfg.WaitTime :: 60
+end func
+
+enum State
+    None
+    Black
+    White
+end enum
+
+func CheckIndex(x:int, y:int) :bool
+    return (x>=0 & y>=0 & x<=7 & y<=7)
+end func
+
+func ReverseOneLine(x0:int, y0:int, dx:int, dy:int, p:reversi@State, board:[][]reversi@State, checkonly:bool) :int
+    var opponent:reversi@State :: p = reversi@State#Black ?(reversi@State#White, reversi@State#Black)
+    var x:int :: x0 + dx
+    var y:int :: y0 + dy
+    if (reversi@CheckIndex(x, y) = false)
+        return 0
+    end if
+    if (board[x][y] <> opponent)
+        return 0
+    end if
+    while (reversi@CheckIndex(x, y) & board[x][y] = opponent)
+        do x :+ dx
+        do y :+ dy
+    end while
+    if (reversi@CheckIndex(x, y) = false | board[x][y] <> p)
+        return 0
+    end if
+    if (checkonly)
+        return 1
+    end if
+
+    do x :- dx
+    do y :- dy
+    var num:int :: 0
+    while (x <> x0 | y <> y0)
+        do board[x][y] :: p
+        do num :+ 1
+        do x :- dx
+        do y :- dy
+    end while
+    return num
+end func
+
+func PutPiece(x:int, y:int, p:reversi@State, board:[][]reversi@State, checkonly:bool) :int
+    if (reversi@CheckIndex(x, y) = false | board[x][y] <> reversi@State#None)
+        return 0
+    end if
+    var n:int :: 0
+    for dx(-1, 1)
+        for dy(-1, 1)
+            if(dx = 0 & dy = 0)
+                continue dy
+            end if
+            do n :+ reversi@ReverseOneLine(x, y,dx,dy, p, board, checkonly)
+        end for
+    end for
+    return n
+end func
+
+func CheckPass(p:reversi@State, board:[][]reversi@State) :bool
+    for i(0, 7)
+        for j(0, 7)
+            if (reversi@PutPiece(i, j, p, board, true) <> 0)
+                return false
+            end if
+        end for
+    end for
+    return true
+end func
+
+func GetRGB(r:&float, g:&float, b:&float, s:reversi@State)
+    switch(s)
+    case(reversi@State#None)
+        do r::0.0
+        do g::0.8
+        do b::0.0
+    case(reversi@State#Black)
+        do r::0.0
+        do g::0.0
+        do b::0.0
+    case(reversi@State#White)
+        do r::0.95
+        do g::0.95
+        do b::0.95
+    end switch
+end func
+
+func DrawPiece(x:int, y:int, s:reversi@State)
+    var r:float
+    var g:float
+    var b:float
+    do reversi@GetRGB(&r, &g, &b, s)
+    var x0:float :: (x * 100)$float + 4.0
+    var y0:float :: (y * 100)$float + 4.0
+    do D3D@DrawRect(x0$float, y0$float, (x0+96.0)$float, (y0+96.0)$float, r, g, b, 1.0)
+end func
+
+func ShowBoard(board:[][]reversi@State)
+    for x(0, 7)
+        for y(0, 7)
+            do reversi@DrawPiece(x, y, board[x][y])
+        end for
+    end for
+end func
+
+func ShowNext(player:reversi@State)
+    var r:float
+    var g:float
+    var b:float
+    do reversi@GetRGB(&r, &g, &b, player)
+    var x:float :: 800.0 + player$int$float * 200.0 - 150.0
+    var y:float :: 300.0
+    do D3D@DrawRect(x, y, x+200.0, y+200.0, r, g, b, 1.0)
+end func
+
+func ShowScores(score:[]int)
+    var s:reversi@State
+    do s :: reversi@State#Black
+    do ShowScore(4, 820, s, score[s$int])
+    do s :: reversi@State#White
+    do ShowScore(4, 840, s, score[s$int])
+    func ShowScore(x:int, y:int, s:reversi@State, score:int)
+        var r:float
+        var g:float
+        var b:float
+        do reversi@GetRGB(&r, &g, &b, s)
+        for i(0, score-1)
+            do D3D@DrawRect((x+i*20)$float, y$float, (x+(i+1)*20-1)$float, (y+19)$float, r, g, b, 1.0)
+        end for
+    end func
+end func
+
+func Main()
+    var board:[][]reversi@State :: @new [8][]reversi@State
+    for i(0, 7)
+        do board[i] :: @new [8]reversi@State
+    end for
+    { Init }
+    do board[3][3] :: reversi@State#White
+    do board[3][4] :: reversi@State#Black
+    do board[4][3] :: reversi@State#Black
+    do board[4][4] :: reversi@State#White
+    var score:[]int :: @new [3]int
+    do score[1] :: 2
+    do score[2] :: 2
+
+    var input_x:float
+    var input_y:float
+    var reversedNum:int
+    var player:reversi@State :: reversi@State#Black
+    while (true)
+        do Kuin@Act()
+        { Background }
+        do D3D@DrawRect(0.0, 0.0, 1600.0, 900.0, 0.45, 0.55, 1.0, 1.0)
+        do D3D@DrawRect(0.0, 0.0, 804.0, 804.0, 0.5, 0.5, 0.5, 1.0)
+        do DI@MousePos(&input_x, &input_y)
+        do input_x :/ 100.0
+        do input_y :/ 100.0
+        if (DI@MouseBtn(DI@EMouseBtn#Left) = 1)
+            do reversedNum :: reversi@PutPiece(input_x$int, input_y$int, player, board, false)
+            if (reversedNum > 0)
+                do board[input_x$int][input_y$int] :: player
+                do score[player$int] :+ reversedNum + 1
+                var opponent:reversi@State :: player = reversi@State#Black ?(reversi@State#White, reversi@State#Black)
+                do score[opponent$int] :- reversedNum
+                do Kuin@Dbg("(b, w) = (" ~ score[1].ToStrF("2d") ~ ", " ~ score[2].ToStrF("2d") ~ ")")
+
+                if (reversi@CheckPass(opponent, board))
+                    if (reversi@CheckPass(player, board))
+                        do Kuin@Dbg("Fin.")
+                    else
+                        do Kuin@Dbg("Pass.")
+                    end if
+                else
+                    do player :: opponent
+                end if
+            end if
+        end if
+        do reversi@ShowBoard(board)
+        do reversi@ShowNext(player)
+        do reversi@ShowScores(score)
+    end while
+end func
+
